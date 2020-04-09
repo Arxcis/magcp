@@ -9,6 +9,7 @@ import (
 
 var PEER_ID = []byte{0xf0, 0x6f, 0x0f, 0xdf, 0x59, 0x7a, 0x12, 0x85, 0x63, 0x36, 0x95, 0xf5, 0x0a, 0x77, 0x3c, 0x91, 0xd9, 0xf1, 0xa4, 0xe5}
 
+// Tracker request done initally to establish connection
 type TrackerRequest struct {
 	// The 20 byte sha1 hash of the bencoded form of the info value from the metainfo file.
 	// This value will almost certainly have to be escaped.
@@ -49,6 +50,35 @@ type TrackerRequest struct {
 	// No completed is sent if the file was complete when started.
 	// Downloaders send an announcement using stopped when they cease downloading.
 	event string
+}
+
+// Received if the TrackerRequest succeeds
+type TrackerResponse struct {
+	// Number of seconds the downloader should wait between regular rerequests,
+	interval int
+
+	// Peers - a list of dictionaries corresponding to peers
+	peers Peer
+}
+
+// Returned in TrackingResponse
+type Peer struct {
+	//  Peer's self-selected ID
+	id string
+
+	// IP address or dns name as a string
+	ip string
+
+	// port number
+	port string
+}
+
+// Received if the TrackerRequest fails
+type TrackerFailure struct {
+	// If a tracker response has a key failure reason,
+	// then that maps to a human readable string
+	// which explains why the query failed, and no other keys are required.
+	reason string
 }
 
 func main() {
