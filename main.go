@@ -20,6 +20,9 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	signal.Notify(quit, os.Kill)
 
+	//
+	// 1. Start tcp peer
+	//
 	peerAddress, err := net.ResolveTCPAddr("tcp", "localhost:3333")
 	if err != nil {
 		log.Panic(err)
@@ -29,6 +32,9 @@ func main() {
 		log.Panic(err)
 	}
 
+	//
+	// 2. Start udp node
+	//
 	nodeAddress, err := net.ResolveUDPAddr("udp", "localhost:3334")
 	if err != nil {
 		log.Panic(err)
@@ -39,6 +45,15 @@ func main() {
 		log.Panic(err)
 	}
 
+	//
+	// 3. Run peer and node
+	//
+	go run_peer(peer)
+	go run_node(node)
+
+	//
+	// 4. Setup shutdown
+	//
 	go graceful_shutdown(peer, node, quit, done)
 
 	<-done
@@ -55,11 +70,11 @@ func graceful_shutdown(peer *net.TCPListener, node *net.UDPConn, quit chan os.Si
 }
 
 // BitTorrent TCP peer
-func run_peer(peer *net.Listener) {
+func run_peer(peer *net.TCPListener) {
 
 }
 
 // DHT UDP node
-func run_node(node *net.Listener) {
+func run_node(node *net.UDPConn) {
 
 }
