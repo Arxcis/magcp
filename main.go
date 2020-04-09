@@ -5,12 +5,9 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"time"
 )
 
 var PEER_ID = []byte{0xf0, 0x6f, 0x0f, 0xdf, 0x59, 0x7a, 0x12, 0x85, 0x63, 0x36, 0x95, 0xf5, 0x0a, 0x77, 0x3c, 0x91, 0xd9, 0xf1, 0xa4, 0xe5}
-
-var NODE_ID = []byte{0xac, 0x79, 0x59, 0xbe, 0xdf, 0x58, 0xb7, 0x88, 0x2e, 0x61, 0x08, 0x10, 0x39, 0x1d, 0x2d, 0xf9, 0x80, 0xcb, 0xbb, 0xea}
 
 func main() {
 	log.Print("Main start")
@@ -44,7 +41,6 @@ func main() {
 
 	// 3. Run peer and node
 	go run_peer(peer)
-	go run_node(node)
 
 	// 4. Setup shutdown
 	go graceful_shutdown(peer, node, quit, done)
@@ -57,8 +53,6 @@ func graceful_shutdown(peer *net.TCPListener, node *net.UDPConn, quit chan os.Si
 	<-quit
 	log.Println("Gracefully shutting down...")
 	peer.Close()
-	node.Close()
-
 	close(done)
 }
 
@@ -66,19 +60,19 @@ const MAX_CONNECTIONS = 32
 
 // BitTorrent TCP peer
 func run_peer(peer *net.TCPListener) {
-	conn, err := peer.AcceptTCP()
-	if err != nil {
-		log.Panic(err)
+	for {
+		conn, err := peer.AcceptTCP()
+		if err != nil {
+			log.Print(err)
+			break
+		}
+
+		go func(conn net.Conn) {
+			defer conn.Close()
+
+		}(conn)
 	}
-	defer conn.Close()
-
-	go func(conn net.Conn) {
-
-	}(conn)
 }
-
-const NODE_TYPE_GOOD = 0x1
-const NODE_TYPE_QUESTIONABLE = 0x2
 
 //
 // Torrent or metainfo file
@@ -130,26 +124,4 @@ type File struct {
 	// the last of which is the actual file name
 	// (a zero length list is an error case).
 	path string
-}
-
-type Node struct {
-	node_type    int
-	last_changed time.Time
-}
-
-var routing_table []Node
-
-// DHT UDP node
-func run_node(node *net.UDPConn) {
-	var buf [1024]byte
-
-	// Reader
-	go func() {
-		for {
-			_, _, err := node.ReadFromUDP(buf[:])
-			if err != nil {
-				log.Panic(err)
-			}
-		}
-	}()
 }
