@@ -84,6 +84,37 @@ func run_connection(conn net.Conn) {
 
 }
 
+// The magnet URI format is:
+//
+// v1: magnet:?xt=urn:btih:<info-hash>&dn=<name>&tr=<tracker-url>&x.pe=<peer-address>
+// v2: magnet:?xt=urn:btmh:<tagged-info-hash>&dn=<name>&tr=<tracker-url>&x.pe=<peer-address>
+//
+type Magnet struct {
+	// Is the info-hash hex encoded, for a total of 40 characters.
+	// For compatability with existing links in the wild, clients should also support the 32 character base32 encoded info-hash.
+	info_hash string
+
+	// Is the multihash formatted, hex encoded full infohash for torrents in the new metadata format.
+	// 'btmh' and 'btih' exact topics may exist in the same magnet if they describe the same hybrid torrent.
+	tagged_info_hash string
+
+	// A peer address expressed as hostname:port, ipv4-literal:port or [ipv6-literal]:port.
+	// This parameter can be included to initiate a direct metadata transfer between two clients
+	// while reducing the need for external peer sources.
+	// It should only be included if the client can discover its public IP address and determine its reachability.
+	// Note: Since no URI scheme identifier has been allocated for bittorrent xs= is not used for this purpose.
+	peer_address []string
+
+	// xt is the only mandatory parameter.
+	xt string
+
+	// dn is the display name that may be used by the client to display while waiting for metadata.
+	dn string
+
+	// tr is a tracker url, if there is one. If there are multiple trackers, multiple tr entries may be included
+	tr []string
+}
+
 //
 // Torrent or metainfo file
 // @see http://www.bittorrent.org/beps/bep_0003.html#metainfo-files 2020-04-09
@@ -272,8 +303,8 @@ type BitfieldMessage struct {
 // The 'have' message's payload is a single number,
 // the index which that downloader just completed and checked the hash of.
 type HaveMessage struct {
-	Type    MessageType
-	message int32
+	Type  MessageType
+	index int32
 }
 
 // 'request' messages contain an index, begin, and length.
