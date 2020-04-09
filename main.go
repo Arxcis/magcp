@@ -9,8 +9,71 @@ import (
 
 var PEER_ID = []byte{0xf0, 0x6f, 0x0f, 0xdf, 0x59, 0x7a, 0x12, 0x85, 0x63, 0x36, 0x95, 0xf5, 0x0a, 0x77, 0x3c, 0x91, 0xd9, 0xf1, 0xa4, 0xe5}
 
+type TrackerRequest struct {
+	// The 20 byte sha1 hash of the bencoded form of the info value from the metainfo file.
+	// This value will almost certainly have to be escaped.
+	info_hash string
+
+	// A string of length 20 which this downloader uses as its id.
+	// Each downloader generates its own id at random at the start of a new download.
+	// This value will also almost certainly have to be escaped.
+	peer_id string
+
+	// An optional parameter giving the IP (or dns name) which this peer is at.
+	// Generally used for the origin if it's on the same machine as the tracker.
+	ip string
+
+	// The port number this peer is listening on.
+	// Common behavior is for a downloader to try to listen on port 6881
+	// and if that port is taken try 6882, then 6883, etc. and give up after 6889.
+	port string
+
+	// The total amount uploaded so far, encoded in base ten ascii.
+	uploaded int
+
+	// The total amount downloaded so far, encoded in base ten ascii.
+	downloaded int
+
+	// The number of bytes this peer still has to download, encoded in base ten ascii.
+	// Note that this can't be computed from downloaded
+	// and the file length since it might be a resume,
+	// and there's a chance that some of the downloaded data
+	// failed an integrity check and had to be re-downloaded.
+	left int
+
+	// This is an optional key which maps to started, completed, or stopped
+	// (or empty, which is the same as not being present).
+	// If not present, this is one of the announcements done at regular intervals.
+	// An announcement using started is sent when a download first begins,
+	// and one using completed is sent when the download is complete.
+	// No completed is sent if the file was complete when started.
+	// Downloaders send an announcement using stopped when they cease downloading.
+	event string
+}
+
 func main() {
+	log.Print()
 	log.Print("Main start")
+
+	if len(os.Args) != 2 {
+		log.Fatal("len(os.Args) != 2")
+	}
+
+	arg := os.Args[1]
+	if arg != "magnet" && arg != "seed" {
+		log.Fatal(`arg != "magnet" || arg != "seed"`)
+	}
+
+	if arg == "magnet" {
+		log.Print("You are a magnet")
+	} else {
+		log.Print("You are a seeder")
+		_, err := net.Dial("tcp", "localhost:3334")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	}
 
 	quit := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
@@ -19,37 +82,22 @@ func main() {
 	signal.Notify(quit, os.Kill)
 
 	// 1. Start tcp peer
-	peerAddress, err := net.ResolveTCPAddr("tcp", "localhost:3333")
+	peer, err := net.Listen("tcp", "localhost:3333")
 	if err != nil {
-		log.Panic(err)
-	}
-	peer, err := net.ListenTCP("tcp", peerAddress)
-	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
-	// 2. Start udp node
-	nodeAddress, err := net.ResolveUDPAddr("udp", "localhost:3334")
-	if err != nil {
-		log.Panic(err)
-	}
-
-	node, err := net.ListenUDP("udp", nodeAddress)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	// 3. Run peer and node
+	// 3. Run peer
 	go run_peer(peer)
 
 	// 4. Setup shutdown
-	go graceful_shutdown(peer, node, quit, done)
+	go graceful_shutdown(peer, quit, done)
 
 	<-done
 	log.Println("Main exit")
 }
 
-func graceful_shutdown(peer *net.TCPListener, node *net.UDPConn, quit chan os.Signal, done chan bool) {
+func graceful_shutdown(peer net.Listener, quit chan os.Signal, done chan bool) {
 	<-quit
 	log.Println("Gracefully shutting down...")
 	peer.Close()
@@ -59,19 +107,21 @@ func graceful_shutdown(peer *net.TCPListener, node *net.UDPConn, quit chan os.Si
 const MAX_CONNECTIONS = 32
 
 // BitTorrent TCP peer
-func run_peer(peer *net.TCPListener) {
+func run_peer(peer net.Listener) {
 	for {
-		conn, err := peer.AcceptTCP()
+		conn, err := peer.Accept()
 		if err != nil {
 			log.Print(err)
 			break
 		}
 
-		go func(conn net.Conn) {
-			defer conn.Close()
-
-		}(conn)
+		go run_connection(conn)
 	}
+}
+
+func run_connection(conn net.Conn) {
+	defer conn.Close()
+
 }
 
 //
